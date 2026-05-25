@@ -252,26 +252,52 @@
             <div class="radio-card"><input type="radio" name="i94" value="nao" id="i94n" onchange="onI94Change()"><label class="radio-label no" for="i94n">✗ Não</label></div>
           </div>
         </div>
-        <!-- Com I-94 -->
-        <div class="check-item" id="i94-item" data-key="i94" style="display:none">
-          <div class="check-cols">
-            <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="I-94 — Impresso" onclick="updateProgress()"></div>
-            <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="I-94 — DC" onclick="updateProgress()"></div>
+        <!-- Com I-94 → mostrar checkbox + perguntar empresa -->
+        <div id="i94-com" style="display:none">
+          <div class="check-item" id="i94-item" data-key="i94">
+            <div class="check-cols">
+              <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="I-94 — Impresso" onclick="updateProgress()"></div>
+              <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="I-94 — DC" onclick="updateProgress()"></div>
+            </div>
+            <div class="check-text"><div class="check-label">I-94 válido</div></div>
           </div>
-          <div class="check-text"><div class="check-label">I-94 válido</div></div>
+          <div class="trigger-field" style="background:rgba(37,99,235,0.03)">
+            <div class="trigger-label">Compra em nome de empresa?</div>
+            <div class="radio-group">
+              <div class="radio-card"><input type="radio" name="empresa-i94" value="sim" id="emp1" onchange="onEmpresaI94Change()"><label class="radio-label yes" for="emp1">✓ Sim</label></div>
+              <div class="radio-card"><input type="radio" name="empresa-i94" value="nao" id="emp2" onchange="onEmpresaI94Change()"><label class="radio-label no" for="emp2">✗ Não</label></div>
+            </div>
+          </div>
         </div>
-        <!-- Sem I-94 → empresa -->
-        <div id="field-empresa" style="display:none">
+        <!-- Sem I-94 → empresa obrigatória -->
+        <div id="field-empresa-sem-i94" style="display:none">
           <div class="trigger-field" style="background:rgba(239,68,68,0.04)">
-            <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:8px;">⚠️ Sem I-94 — documentação da empresa obrigatória</div>
-            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">O cliente deve comprar como empresa. O Sunbiz deve constar o comprador como dono.</div>
+            <div style="font-size:12px;color:var(--red);font-weight:600;margin-bottom:6px;">⚠️ Sem I-94 — compra deve ser em nome da empresa</div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:1.6;">O Sunbiz deve constar o comprador como dono.</div>
           </div>
+        </div>
+        <!-- Documentação da empresa (aparece nos dois cenários) -->
+        <div id="field-empresa-docs" style="display:none">
           <div class="check-item" data-key="sunbiz">
             <div class="check-cols">
               <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="Sunbiz — Impresso" onclick="updateProgress()"></div>
               <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="Sunbiz — DC" onclick="updateProgress()"></div>
             </div>
             <div class="check-text"><div class="check-label">Sunbiz da empresa</div><div class="check-sub">Comprador deve constar como dono</div></div>
+          </div>
+          <div class="check-item" data-key="poa-empresa">
+            <div class="check-cols">
+              <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="POA Empresa — Impresso" onclick="updateProgress()"></div>
+              <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="POA Empresa — DC" onclick="updateProgress()"></div>
+            </div>
+            <div class="check-text"><div class="check-label">POA em nome da empresa</div></div>
+          </div>
+          <div class="check-item" data-key="cert-empresa">
+            <div class="check-cols">
+              <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="Application Certificate of Title (Empresa) — Impresso" onclick="updateProgress()"></div>
+              <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="Application Certificate of Title (Empresa) — DC" onclick="updateProgress()"></div>
+            </div>
+            <div class="check-text"><div class="check-label">Application for Certificate of Title</div><div class="check-sub">Em nome da empresa</div></div>
           </div>
         </div>
       </div>
@@ -339,7 +365,7 @@
       </div>
       <div class="check-item" id="summary-item" data-key="summary-fi" style="display:none">
         <div class="check-cols">
-          <div class="check-col" style="width:52px;opacity:0;pointer-events:none;"><div class="check-col-label">—</div><input type="checkbox" style="visibility:hidden"></div>
+          <div class="check-col"><div class="check-col-label">Impresso</div><input type="checkbox" class="doc-check" data-doc="Summary F&I — Impresso" onclick="updateProgress()"></div>
           <div class="check-col"><div class="check-col-label">No DC</div><input type="checkbox" class="doc-check" data-doc="Summary F&I — DC" onclick="updateProgress()"></div>
         </div>
         <div class="check-text"><div class="check-label">Summary F&I (Docusign)</div><div class="check-sub">Apenas quando cliente assina online</div></div>
@@ -737,14 +763,27 @@ document.querySelectorAll('input[name="vendedor"]').forEach(r=>{
 function onPassaporteChange(){
   const val = document.querySelector('input[name="passaporte"]:checked')?.value;
   document.getElementById('field-i94').style.display = val==='sim'?'block':'none';
-  if(val!=='sim'){document.getElementById('i94-item').style.display='none';document.getElementById('field-empresa').style.display='none';}
+  if(val!=='sim'){
+    document.getElementById('i94-com').style.display='none';
+    document.getElementById('field-empresa-sem-i94').style.display='none';
+    document.getElementById('field-empresa-docs').style.display='none';
+  }
   updateProgress();
 }
 
 function onI94Change(){
   const val = document.querySelector('input[name="i94"]:checked')?.value;
-  document.getElementById('i94-item').style.display = val==='sim'?'flex':'none';
-  document.getElementById('field-empresa').style.display = val==='nao'?'block':'none';
+  document.getElementById('i94-com').style.display = val==='sim'?'block':'none';
+  document.getElementById('field-empresa-sem-i94').style.display = val==='nao'?'block':'none';
+  document.getElementById('field-empresa-docs').style.display = val==='nao'?'block':'none';
+  // Reset empresa choice if switching
+  if(val==='sim') document.getElementById('field-empresa-docs').style.display='none';
+  updateProgress();
+}
+
+function onEmpresaI94Change(){
+  const val = document.querySelector('input[name="empresa-i94"]:checked')?.value;
+  document.getElementById('field-empresa-docs').style.display = val==='sim'?'block':'none';
   updateProgress();
 }
 
