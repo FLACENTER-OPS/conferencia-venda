@@ -129,6 +129,29 @@
   .update-banner-title{font-size:13px;font-weight:700;color:var(--amber);margin-bottom:4px;}
   .update-banner-sub{font-size:12px;color:var(--text-muted);line-height:1.5;}
 
+  /* CORRECTION SCREEN */
+  .correction-screen { display:none; max-width:600px; margin:0 auto; padding:20px 20px 80px; }
+  .corr-header { background:var(--card); border:1px solid rgba(245,158,11,0.3); border-radius:var(--radius); padding:20px; margin-bottom:16px; }
+  .corr-badge { display:inline-block; background:var(--amber-glow); border:1px solid rgba(245,158,11,0.3); color:var(--amber); font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; margin-bottom:12px; }
+  .corr-deal { font-family:'DM Mono',monospace; font-size:13px; color:var(--blue-light); margin-bottom:4px; }
+  .corr-vendedor { font-size:12px; color:var(--text-muted); margin-bottom:8px; }
+  .corr-motivo-label { font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px; }
+  .corr-motivo-text { font-size:13px; color:var(--red); font-weight:500; }
+  .corr-progress-label { font-size:11px; color:var(--text-muted); font-family:'DM Mono',monospace; text-align:right; margin-bottom:10px; }
+  .corr-list { background:var(--card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; margin-bottom:12px; }
+  .corr-item { border-bottom:1px solid var(--border); transition:background 0.15s; }
+  .corr-item:last-child { border-bottom:none; }
+  .corr-item-inner { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; }
+  .corr-check { appearance:none; -webkit-appearance:none; width:22px; height:22px; min-width:22px; border:1.5px solid var(--border-active); border-radius:5px; background:var(--surface); cursor:pointer; position:relative; transition:all 0.15s; }
+  .corr-check:checked { background:var(--green); border-color:var(--green); }
+  .corr-check:checked::after { content:''; position:absolute; left:6px; top:3px; width:8px; height:5px; border-left:2px solid white; border-bottom:2px solid white; transform:rotate(-45deg); }
+  .corr-label { flex:1; display:flex; align-items:center; justify-content:space-between; cursor:pointer; }
+  .corr-doc-name { font-size:13px; color:var(--text); line-height:1.4; }
+  .corr-status { font-size:11px; color:var(--red); font-weight:600; flex-shrink:0; margin-left:8px; }
+  .btn-corrigir { width:100%; padding:15px; background:var(--amber); color:#0a0d12; border:none; border-radius:var(--radius); font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-top:4px; }
+  .btn-corrigir:hover { opacity:0.9; transform:translateY(-1px); }
+  .btn-corrigir:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+
   .form-wrap.hidden{display:none;}
 </style>
 </head>
@@ -667,6 +690,30 @@
 </div>
 </div><!-- .form-wrap -->
 
+<!-- CORRECTION SCREEN -->
+<div class="correction-screen" id="correctionScreen">
+  <div class="corr-header">
+    <div class="corr-badge">⚠️ Correção pendente</div>
+    <div class="corr-deal" id="corr-deal-id"></div>
+    <div class="corr-vendedor" id="corr-vendedor"></div>
+    <div class="corr-motivo-label">Bloqueado por:</div>
+    <div class="corr-motivo-text" id="corr-motivos"></div>
+  </div>
+  <div class="section-header" style="padding:8px 0 10px">
+    <div class="section-icon amber">📋</div>
+    <div class="section-title" style="font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.08em;">Itens para corrigir</div>
+  </div>
+  <div class="corr-progress-label" id="corr-progress">0 de 0 itens corrigidos</div>
+  <div class="corr-list" id="corr-items"></div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="field">
+      <div class="field-label">Observação (opcional)</div>
+      <textarea id="corr-obs" rows="2" placeholder="Ex: documento enviado por email, aguardando…" style="resize:none"></textarea>
+    </div>
+  </div>
+  <button class="btn-corrigir" id="btnCorrigir" disabled onclick="submitCorrection()">Enviar correção →</button>
+</div>
+
 <div class="success-screen" id="successScreen">
   <div class="success-icon">✓</div>
   <div class="success-title" id="successTitle">Conferência enviada!</div>
@@ -698,46 +745,106 @@ async function checkExistingDeal(id){
     const data = await res.json();
     if(!data.success) return;
     const deal = data.deals.find(d => d.id === id && d.status === 'bloqueado');
-    if(deal){ loadUpdateMode(deal); }
+    if(deal){ enterCorrectionMode(deal); }
     else { clearUpdateMode(); }
-  } catch(e){ /* silently fail — offline mode */ }
+  } catch(e){ /* silently fail */ }
 }
 
-function loadUpdateMode(deal){
+// MODO CORREÇÃO — mostra só os itens pendentes
+function enterCorrectionMode(deal){
   isUpdateMode = true;
   existingDeal = deal;
-  document.getElementById('headerMode').textContent = 'Atualização';
-  document.getElementById('headerMode').classList.add('update');
-  document.getElementById('btnSubmit').textContent = 'Reenviar para revisão →';
-  document.getElementById('btnSubmit').classList.add('update-btn');
-  const banner = document.getElementById('updateBanner');
-  banner.classList.add('show');
-  const motivos = deal.motivos?.join(', ') || 'pendências identificadas';
-  document.getElementById('updateBannerText').textContent =
-    `Deal bloqueado por: ${motivos}. Resolva os itens e reenvie.`;
 
-  // Pre-fill fields
-  document.getElementById('vin').value = deal.vin || '';
-  document.getElementById('veiculo').value = deal.veiculo || '';
+  // Esconde o form normal
+  document.getElementById('formWrap').classList.add('hidden');
+  // Mostra a tela de correção
+  buildCorrectionScreen(deal);
+  document.getElementById('correctionScreen').style.display = 'block';
+}
 
-  // Highlight pending items
-  deal.pendentes?.forEach(docLabel => {
-    document.querySelectorAll('.check-item').forEach(item => {
-      const cbs = item.querySelectorAll('.doc-check');
-      cbs.forEach(cb => {
-        if(cb.dataset.doc && docLabel.includes(cb.dataset.doc.split(' — ')[0])){
-          item.classList.add('pending-item');
-          const label = item.querySelector('.check-label');
-          if(label && !label.querySelector('.pending-tag')){
-            const tag = document.createElement('span');
-            tag.className = 'pending-tag';
-            tag.textContent = 'pendente';
-            label.appendChild(tag);
-          }
-        }
-      });
+function buildCorrectionScreen(deal){
+  const screen = document.getElementById('correctionScreen');
+  const pendentes = deal.pendentes || [];
+
+  document.getElementById('corr-deal-id').textContent = `Deal ${deal.id} · ${deal.veiculo}`;
+  document.getElementById('corr-vendedor').textContent = deal.vendedor;
+  document.getElementById('corr-motivos').textContent = deal.motivos?.join(', ') || 'Pendências identificadas';
+
+  // Constrói a lista de itens pendentes
+  const list = document.getElementById('corr-items');
+  list.innerHTML = '';
+
+  if(pendentes.length === 0){
+    list.innerHTML = '<div style="padding:16px;color:var(--text-muted);font-size:14px">Nenhum item pendente encontrado.</div>';
+    return;
+  }
+
+  pendentes.forEach(docLabel => {
+    const item = document.createElement('div');
+    item.className = 'corr-item';
+    item.innerHTML = `
+      <div class="corr-item-inner">
+        <input type="checkbox" class="corr-check" data-doc="${docLabel}" id="corr-${docLabel.replace(/[^a-z0-9]/gi,'_')}">
+        <label for="corr-${docLabel.replace(/[^a-z0-9]/gi,'_')}" class="corr-label">
+          <span class="corr-doc-name">${docLabel}</span>
+          <span class="corr-status">pendente</span>
+        </label>
+      </div>
+    `;
+    item.querySelector('input').addEventListener('change', (e) => {
+      const status = item.querySelector('.corr-status');
+      if(e.target.checked){
+        status.textContent = '✓ corrigido';
+        status.style.color = 'var(--green)';
+        item.style.background = 'rgba(16,185,129,0.05)';
+      } else {
+        status.textContent = 'pendente';
+        status.style.color = 'var(--red)';
+        item.style.background = '';
+      }
+      updateCorrectionProgress();
     });
+    list.appendChild(item);
   });
+
+  updateCorrectionProgress();
+}
+
+function updateCorrectionProgress(){
+  const all = document.querySelectorAll('.corr-check');
+  const checked = Array.from(all).filter(cb => cb.checked).length;
+  document.getElementById('corr-progress').textContent = `${checked} de ${all.length} itens corrigidos`;
+  document.getElementById('btnCorrigir').disabled = checked === 0;
+}
+
+async function submitCorrection(){
+  const btn = document.getElementById('btnCorrigir');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+
+  const corrigidos = Array.from(document.querySelectorAll('.corr-check:checked')).map(cb => cb.dataset.doc);
+  const aindaPendentes = Array.from(document.querySelectorAll('.corr-check:not(:checked)')).map(cb => cb.dataset.doc);
+  const obs = document.getElementById('corr-obs').value.trim();
+
+  const payload = {
+    action: 'correction',
+    id: existingDeal.id,
+    corrigidos,
+    aindaPendentes,
+    obs,
+    timestamp: new Date().toISOString(),
+  };
+
+  try {
+    await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+  } catch(e){ /* continue */ }
+
+  // Mostra sucesso
+  document.getElementById('correctionScreen').style.display = 'none';
+  document.getElementById('successScreen').classList.add('show');
+  document.getElementById('successTitle').textContent = 'Correção enviada!';
+  document.getElementById('successSub').textContent = 'A Giovanna foi notificada e vai revisar os itens corrigidos.';
+  document.getElementById('successDealId').textContent = `Deal ${existingDeal.id} · ${existingDeal.veiculo}`;
 }
 
 function clearUpdateMode(){
@@ -748,8 +855,8 @@ function clearUpdateMode(){
   document.getElementById('btnSubmit').textContent = 'Enviar Conferência →';
   document.getElementById('btnSubmit').classList.remove('update-btn');
   document.getElementById('updateBanner').classList.remove('show');
-  document.querySelectorAll('.pending-item').forEach(el => el.classList.remove('pending-item'));
-  document.querySelectorAll('.pending-tag').forEach(el => el.remove());
+  document.getElementById('correctionScreen').style.display = 'none';
+  document.getElementById('formWrap').classList.remove('hidden');
 }
 
 // Vendedor
